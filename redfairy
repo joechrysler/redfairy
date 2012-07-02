@@ -6,11 +6,9 @@ require "redis"
 # Like the legendary fairy in a bottle, this wee bit o ruby
 # hovers around a redis server, reviving him when he falls.
 
-write_server = 'localhost'
-write_port = 6381
-write_conf = 'writes.conf'
-read_port = 6382
-read_conf = 'reads.conf'
+host = 'localhost'
+port = 6379
+conf = 'logs.conf'
 for_a_while = 10 #seconds
 
 command = ARGV[0] || 'start'
@@ -22,27 +20,18 @@ if command == 'stop'
 end
 if command =~ /stop|restart/
 	puts "Kill running redis servers..."
-	stop_threads << Thread.new {system "ps -eopid,cmd | grep 'redis-server #{read_conf}' | grep -v grep | cut -c-5 | xargs -r kill"}
-	stop_threads << Thread.new {system "ps -eopid,cmd | grep 'redis-server #{write_conf}'| grep -v grep | cut -c-5 | xargs -r kill"}
+	stop_threads << Thread.new {system "ps -eopid,cmd | grep 'redis-server #{conf}' | grep -v grep | cut -c-5 | xargs -r kill"}
 end
 stop_threads.each {|t| t.join}
 
 loop do
 	threads = []
 	begin
-		db = Redis.new(:host => write_server, :port => write_port)
-		puts "Write server maintaining #{db.dbsize} healthy keys in #{db.info['used_memory_human']} memory."
+		db = Redis.new(:host => host, :port => port)
+		puts "Server maintaining #{db.dbsize} healthy keys in #{db.info['used_memory_human']} memory."
 		GC.start # free up the database object, elsewise memory usage creeps up
 	rescue
-		threads << Thread.new {system 'redis-server writes.conf && echo "Starting write server..."'}
-	end
-
-	begin
-		db = Redis.new(:port => read_port)
-		puts "Read server maintaining #{db.dbsize} healthy keys in #{db.info['used_memory_human']} memory."
-		GC.start
-	rescue
-		threads << Thread.new {system 'redis-server reads.conf && echo "Starting read server..."'}
+		threads << Thread.new {system "redis-server #{conf} && echo \"Starting server...\""}
 	end
 
 	threads.each {|t| t.join}
